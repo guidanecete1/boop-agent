@@ -135,10 +135,24 @@ export async function initWhatsApp(opts: {
       for (const m of messages) {
         try {
           if (m.key.fromMe) continue
-          const jid = m.key.remoteJid
-          if (!jid || isGroupJid(jid)) continue
+          const rawJid = m.key.remoteJid
+          if (!rawJid || isGroupJid(rawJid)) continue
+          // WhatsApp now delivers many inbound messages with a LID-format JID
+          // (`<numeric>@lid`). The phone-number JID lives in `remoteJidAlt`.
+          // Prefer that when available; fall back to `remoteJid` for legacy
+          // `@s.whatsapp.net` deliveries.
+          const keyAny = m.key as unknown as { remoteJidAlt?: string }
+          const jid =
+            rawJid.endsWith('@lid') && keyAny.remoteJidAlt
+              ? keyAny.remoteJidAlt
+              : rawJid
           const fromE164 = jidToE164(jid)
-          if (!fromE164) continue
+          if (!fromE164) {
+            console.log(
+              `[whatsapp] dropped — could not resolve sender JID (raw=${rawJid}, alt=${keyAny.remoteJidAlt ?? 'none'})`,
+            )
+            continue
+          }
           if (!isAllowed(fromE164, opts.allowedNumbers)) {
             console.log(`[whatsapp] dropped non-allowlisted sender ${fromE164}`)
             continue
