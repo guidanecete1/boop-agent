@@ -3,9 +3,12 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
-import { addClient } from "./broadcast.js";
-import { createSendblueRouter } from "./sendblue.js";
+import { addClient, broadcast } from "./broadcast.js";
 import { handleUserMessage } from "./interaction-agent.js";
+import { initWhatsApp } from "./whatsapp.js";
+import { setMessenger } from "./messaging.js";
+import { api } from "../convex/_generated/api.js";
+import { convex } from "./convex-client.js";
 import { loadIntegrations } from "./integrations/registry.js";
 import { startCleanupLoop } from "./memory/clean.js";
 import { startAutomationLoop } from "./automations.js";
@@ -52,7 +55,6 @@ async function main() {
     res.json({ ok: true, service: "boop-agent" });
   });
 
-  app.use("/sendblue", createSendblueRouter());
   app.use("/composio", createComposioRouter());
   app.use("/memory", createMemoryRouter());
 
@@ -111,8 +113,84 @@ async function main() {
     console.log(`boop-agent server listening on :${port}`);
     console.log(`  health      GET  http://localhost:${port}/health`);
     console.log(`  chat        POST http://localhost:${port}/chat`);
-    console.log(`  sendblue    POST http://localhost:${port}/sendblue/webhook`);
+    console.log(`  whatsapp    (Baileys, in-process — see logs above for QR on first run)`);
     console.log(`  websocket   WS   ws://localhost:${port}/ws`);
+  });
+
+  const allowedNumbers = (process.env.WHATSAPP_ALLOWED_NUMBERS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (allowedNumbers.length === 0) {
+    console.warn(
+      "[whatsapp] WHATSAPP_ALLOWED_NUMBERS is empty — all inbound messages will be dropped",
+    );
+  }
+
+  const wa = await initWhatsApp({
+    sessionDir: process.env.WHATSAPP_SESSION_DIR ?? "./auth_info_baileys",
+    allowedNumbers,
+  });
+  setMessenger(wa);
+
+  wa.onMessage(async (msg) => {
+    const conversationId = `wa:${msg.fromE164}`;
+    const turnTag = Math.random().toString(36).slice(2, 8);
+    const previewText =
+      msg.text.length > 100 ? msg.text.slice(0, 100) + "…" : msg.text;
+    console.log(
+      `[turn ${turnTag}] ← ${msg.fromE164} (${msg.language}): ${JSON.stringify(previewText)}`,
+    );
+    const start = Date.now();
+
+    broadcast("message_in", {
+      conversationId,
+      content: msg.text,
+      from_number: msg.fromE164,
+      handle: msg.messageId,
+    });
+
+    await wa.setTyping(msg.fromE164, true);
+
+    // Pragmatic language hint: prepend a one-line directive so the dispatcher
+    // doesn't need a signature change for Spec 1. Spec 5 will replace this
+    // with a proper meta field on handleUserMessage.
+    const langHint =
+      msg.language === "es"
+        ? "(Reply in Spanish.) "
+        : msg.language === "en"
+          ? "(Reply in English.) "
+          : "";
+    const content = langHint + msg.text;
+
+    try {
+      const reply = await handleUserMessage({
+        conversationId,
+        content,
+        turnTag,
+        onThinking: (t) => broadcast("thinking", { conversationId, t }),
+      });
+      if (reply) {
+        const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+        const replyPreview =
+          reply.length > 100 ? reply.slice(0, 100) + "…" : reply;
+        console.log(
+          `[turn ${turnTag}] → reply (${elapsed}s, ${reply.length} chars): ${JSON.stringify(replyPreview)}`,
+        );
+        await wa.send(msg.fromE164, reply);
+        await convex.mutation(api.messages.send, {
+          conversationId,
+          role: "assistant",
+          content: reply,
+        });
+      } else {
+        console.log(`[turn ${turnTag}] → (no reply)`);
+      }
+    } catch (err) {
+      console.error(`[turn ${turnTag}] handler error`, err);
+    } finally {
+      await wa.setTyping(msg.fromE164, false);
+    }
   });
 }
 

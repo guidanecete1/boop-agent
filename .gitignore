@@ -17,3 +17,9 @@ data/
 debug/dist/
 .cache/
 .tsbuildinfo
+
+# Baileys WhatsApp Web auth state (NEVER commit — contains session credentials)
+auth_info_baileys/
+
+# TypeScript incremental build info
+*.tsbuildinfo

@@ -10,7 +10,7 @@ import { createDraftDecisionMcp } from "./draft-tools.js";
 import { createSelfMcp } from "./self-tools.js";
 import { getRuntimeModel } from "./runtime-config.js";
 import { broadcast } from "./broadcast.js";
-import { sendImessage } from "./sendblue.js";
+import { sendMessage } from "./messaging.js";
 import { aggregateUsageFromResult, EMPTY_USAGE, type UsageTotals } from "./usage.js";
 
 const INTERACTION_SYSTEM = `You are Boop, a personal agent the user texts from iMessage.
@@ -224,7 +224,7 @@ export async function handleUserMessage(opts: HandleOpts): Promise<string> {
           // so the debug UI sees it.
           if (opts.conversationId.startsWith("sms:") && opts.kind !== "proactive") {
             const number = opts.conversationId.slice(4);
-            await sendImessage(number, text);
+            await sendMessage(number, text);
           }
           await convex.mutation(api.messages.send, {
             conversationId: opts.conversationId,
