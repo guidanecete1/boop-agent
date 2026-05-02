@@ -10,6 +10,7 @@ import {
   DashboardSquare01Icon,
   ArrowShrink02Icon,
   Settings01Icon,
+  Folder02Icon,
 } from "@hugeicons/core-free-icons";
 import { api } from "../../convex/_generated/api.js";
 import { useSocket } from "./lib/useSocket.js";
@@ -21,6 +22,7 @@ import { EventsPanel } from "./components/EventsPanel.js";
 import { ConnectionsPanel } from "./components/ConnectionsPanel.js";
 import { ConsolidationPanel } from "./components/ConsolidationPanel.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
+import { ProjectsPanel } from "./components/ProjectsPanel.js";
 
 type View =
   | "dashboard"
@@ -30,6 +32,7 @@ type View =
   | "events"
   | "consolidation"
   | "connections"
+  | "projects"
   | "settings";
 
 type Theme = "dark" | "light";
@@ -42,6 +45,7 @@ const NAV_ICONS: Record<View, any> = {
   events: Activity01Icon,
   consolidation: ArrowShrink02Icon,
   connections: Link04Icon,
+  projects: Folder02Icon,
   settings: Settings01Icon,
 };
 
@@ -53,6 +57,7 @@ const NAV: { id: View; label: string }[] = [
   { id: "events", label: "Events" },
   { id: "consolidation", label: "Consolidation" },
   { id: "connections", label: "Connections" },
+  { id: "projects", label: "Projects" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -229,6 +234,7 @@ export function App() {
             {view === "events" && <EventsPanel isDark={isDark} />}
             {view === "consolidation" && <ConsolidationPanel isDark={isDark} />}
             {view === "connections" && <ConnectionsPanel isDark={isDark} />}
+            {view === "projects" && <ProjectsPanel isDark={isDark} />}
             {view === "settings" && <SettingsPanel isDark={isDark} />}
           </div>
         </main>
