@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import { addClient, broadcast } from "./broadcast.js";
 import { handleUserMessage } from "./interaction-agent.js";
 import { initWhatsApp } from "./whatsapp.js";
+import { setMessenger } from "./messaging.js";
 import { api } from "../convex/_generated/api.js";
 import { convex } from "./convex-client.js";
 import { loadIntegrations } from "./integrations/registry.js";
@@ -130,6 +131,7 @@ async function main() {
     sessionDir: process.env.WHATSAPP_SESSION_DIR ?? "./auth_info_baileys",
     allowedNumbers,
   });
+  setMessenger(wa);
 
   wa.onMessage(async (msg) => {
     const conversationId = `wa:${msg.fromE164}`;

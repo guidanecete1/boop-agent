@@ -1,4 +1,5 @@
 import { tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+import { isMessagingReady } from "./messaging.js";
 import { z } from "zod";
 import {
   CURATED_TOOLKITS,
@@ -49,7 +50,7 @@ export function createSelfMcp() {
             // which one is actually running this turn.
             embeddingsEnabled: true,
             embeddingsProvider: activeEmbeddingProvider(),
-            sendblueEnabled: Boolean(process.env.SENDBLUE_API_KEY),
+            whatsappEnabled: isMessagingReady(),
           };
           return {
             content: [{ type: "text" as const, text: JSON.stringify(config, null, 2) }],

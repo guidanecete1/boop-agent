@@ -9,7 +9,7 @@ import { api } from "../convex/_generated/api.js";
 import { convex } from "./convex-client.js";
 import { aggregateUsageFromResult, EMPTY_USAGE, type UsageTotals } from "./usage.js";
 import { handleUserMessage } from "./interaction-agent.js";
-import { sendImessage } from "./sendblue.js";
+import { sendMessage } from "./messaging.js";
 import { ensureTrigger, getComposio, listConnectedToolkits } from "./composio.js";
 import { ensureWebhookSubscription } from "./composio-webhook.js";
 import { describeUserNow } from "./timezone-config.js";
@@ -309,7 +309,7 @@ async function dispatchProactiveNotice(summary: string): Promise<void> {
   // handleUserMessage only sends iMessage from inside send_ack; the final
   // reply is the caller's responsibility.
   if (reply && reply !== "(no reply)") {
-    await sendImessage(phone, reply);
+    await sendMessage(phone, reply);
     await convex.mutation(api.messages.send, {
       conversationId,
       role: "assistant",
@@ -318,7 +318,7 @@ async function dispatchProactiveNotice(summary: string): Promise<void> {
   } else {
     // IA stayed silent — fall back to the raw classifier summary so the
     // user still gets the notice; otherwise classification was a no-op.
-    await sendImessage(phone, summary);
+    await sendMessage(phone, summary);
     await convex.mutation(api.messages.send, {
       conversationId,
       role: "assistant",
