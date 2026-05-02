@@ -175,13 +175,17 @@ export async function handleUserMessage(opts: HandleOpts): Promise<string> {
               content: [{ type: "text" as const, text: "Empty ack skipped." }],
             };
           }
-          // Skip the iMessage send for proactive turns — those go out as a
+          // Skip the WhatsApp send for proactive turns — those go out as a
           // single self-contained notice from dispatchProactiveNotice. If the
           // IA calls send_ack here on a proactive turn, the user would get
-          // two iMessages (the ack + the final reply). Still persist + log
+          // two messages (the ack + the final reply). Still persist + log
           // so the debug UI sees it.
-          if (opts.conversationId.startsWith("sms:") && opts.kind !== "proactive") {
-            const number = opts.conversationId.slice(4);
+          //
+          // Conversation IDs are `wa:<E.164>` post-Spec 1; the "sms:" prefix
+          // from the iMessage era is kept here for read-back compatibility
+          // with old Convex history but isn't a forwardable destination.
+          if (opts.conversationId.startsWith("wa:") && opts.kind !== "proactive") {
+            const number = opts.conversationId.slice(3);
             await sendMessage(number, text);
           }
           await convex.mutation(api.messages.send, {
