@@ -43,6 +43,9 @@ export const CURATED_TOOLKITS: CuratedToolkit[] = [
   { slug: "salesforce", displayName: "Salesforce", authMode: "managed" },
   { slug: "twitter", displayName: "Twitter / X", authMode: "byo" },
   { slug: "linkedin", displayName: "LinkedIn", authMode: "managed" },
+  { slug: "vercel", displayName: "Vercel", authMode: "managed" },
+  { slug: "firecrawl", displayName: "Firecrawl", authMode: "managed" },
+  { slug: "elevenlabs", displayName: "ElevenLabs", authMode: "managed" },
 ];
 
 const DISPLAY_NAME_BY_SLUG = new Map(CURATED_TOOLKITS.map((t) => [t.slug, t.displayName]));
