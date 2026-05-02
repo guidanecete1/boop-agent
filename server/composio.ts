@@ -494,13 +494,17 @@ export async function authorizeToolkit(
     }
   }
 
-  // 2. Initiate the connection. allowMultiple if there's already an active connection
-  //    so we add another account instead of replacing.
-  const existing = (await listConnectedToolkits()).filter(
-    (c) => c.slug === slug && c.status === "ACTIVE",
-  );
+  // 2. Initiate the connection. Always allowMultiple — adding another account
+  //    is always the right intent here (the dashboard's connect button is "+
+  //    add account", not "replace"). Composio rejects unless allowMultiple is
+  //    set whenever ANY existing connection exists at this auth config — even
+  //    in non-ACTIVE statuses like INITIATED / INITIALIZING — so trying to
+  //    auto-detect from ACTIVE-only existence is brittle and broke for users
+  //    with multiple Google Calendar / Gmail accounts. YAGNI on the
+  //    "don't-allow-multiple" path; reintroduce a guard if a real use case
+  //    appears.
   const conn = await composio.connectedAccounts.initiate(boopUserId(), authConfigId, {
-    ...(existing.length > 0 ? { allowMultiple: true } : {}),
+    allowMultiple: true,
     ...(opts?.callbackUrl ? { callbackUrl: opts.callbackUrl } : {}),
     ...(opts?.alias ? { alias: opts.alias } : {}),
   });
