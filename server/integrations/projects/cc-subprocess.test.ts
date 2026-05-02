@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type MockedFunction } from 'vitest'
 import { EventEmitter } from 'node:events'
 import type { ChildProcess } from 'node:child_process'
 import { runCcSubprocess } from './cc-subprocess.js'
 
-let mockSpawn: ReturnType<typeof vi.fn>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mockSpawn: MockedFunction<(...args: any[]) => any>
 let mockChild: EventEmitter & {
   stdout: EventEmitter
   stderr: EventEmitter
