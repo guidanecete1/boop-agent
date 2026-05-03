@@ -45,7 +45,7 @@ Multi-executor coordination:
 - Path-conflict rule: if two sub-tasks dispatch executors that resolve to the same project path, serialize them.
 
 Database access reminder (read but currently no executor uses it):
-- Each project's metadata.supabase_access tells you "mcp" (standard Supabase MCP) or "management-api" (Mila only — direct Management API). Mention this in plan summaries when DB work is in scope.
+- All projects access Supabase through Composio's Supabase toolkit. Each project (pepbuddy, mila, rosibel-clientes, rosibel-admin, rosibel-website) has its own connected_account under the same toolkit. When dispatching DB work, the executor must select the right connected_account_id based on which project the task is for.
 
 Skill hint rule: when dispatching to a CC-subprocess executor, include in the task brief 1-3 most relevant Claude Code skills:
 - Multi-step code work → "use superpowers:writing-plans"

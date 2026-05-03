@@ -43,7 +43,12 @@ const SEED_PROJECTS = [
     path: "/Users/Alfredo/Documents/Mila app",
     permission: "full" as const,
     metadata: JSON.stringify({
-      supabase_access: "management-api",
+      // Mila's Supabase account is connected separately under the same
+      // Composio Supabase toolkit (allowMultiple), so the unified path
+      // (supabase_access: "mcp") covers it alongside pepbuddy / rosibel.
+      // The Management API path is dropped — revisit only if a real
+      // project-level (org-scoped) ops use case surfaces.
+      supabase_access: "mcp",
       asc_auth_key_path: "/Users/Alfredo/Documents/Mila app/AuthKey_3Z2FX63D4X.p8",
     }),
   },
