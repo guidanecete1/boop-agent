@@ -337,9 +337,27 @@ export async function listConnectedToolkits(): Promise<ConnectedToolkit[]> {
   const composio = getComposio();
   if (!composio) return [];
   try {
-    const resp = await composio.connectedAccounts.list({ userIds: [boopUserId()] });
+    // Composio's connected_accounts API paginates at ~10 items per page.
+    // Without cursor-loop pagination, accounts with 11+ connections lose
+    // visibility on the oldest ones — they silently drop off page 1 as
+    // newer connections are added, which presents in the dashboard as
+    // "connection disappeared" even though it's still ACTIVE on Composio's
+    // side. Walk every page so listConnectedToolkits returns all of them.
+    const firstResp = await composio.connectedAccounts.list({
+      userIds: [boopUserId()],
+    });
+    const allItems = [...firstResp.items];
+    let cursor: string | null | undefined = firstResp.nextCursor ?? null;
+    while (cursor) {
+      const next = await composio.connectedAccounts.list({
+        userIds: [boopUserId()],
+        cursor,
+      });
+      allItems.push(...next.items);
+      cursor = next.nextCursor ?? null;
+    }
     const enriched = await Promise.all(
-      resp.items.map(async (it) => {
+      allItems.map(async (it) => {
         const seed = extractAccountIdentity(
           (it as { state?: unknown }).state,
           (it as { data?: unknown }).data,

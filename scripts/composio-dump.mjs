@@ -16,15 +16,23 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const res = await fetch("https://backend.composio.dev/api/v3/connected_accounts", {
-  headers: { "x-api-key": apiKey },
-});
-if (!res.ok) {
-  console.error(`HTTP ${res.status}: ${await res.text()}`);
-  process.exit(1);
-}
-const data = await res.json();
-const items = data.items ?? [];
+// Composio paginates at 10 items per page; walk every page so a long-running
+// account (lots of connect attempts, multiple Gmail accounts, etc.) doesn't
+// silently truncate.
+const items = [];
+let cursor = null;
+do {
+  const url = new URL("https://backend.composio.dev/api/v3/connected_accounts");
+  if (cursor) url.searchParams.set("cursor", cursor);
+  const res = await fetch(url, { headers: { "x-api-key": apiKey } });
+  if (!res.ok) {
+    console.error(`HTTP ${res.status}: ${await res.text()}`);
+    process.exit(1);
+  }
+  const data = await res.json();
+  items.push(...(data.items ?? []));
+  cursor = data.next_cursor ?? data.nextCursor ?? null;
+} while (cursor);
 
 const byUser = new Map();
 for (const it of items) {
