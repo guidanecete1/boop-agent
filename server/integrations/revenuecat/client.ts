@@ -46,14 +46,16 @@ export function createRevenueCatClient(opts: ClientOpts = {}): RevenueCatClient 
 
   async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
     let res: Response
+    let retried = false
     try {
       res = await fetch(url, init)
     } catch (err) {
       // Network error — single retry
+      retried = true
       await new Promise((r) => setTimeout(r, retryDelayMs))
       res = await fetch(url, init)
     }
-    if (res.status === 429 || res.status >= 500) {
+    if (!retried && (res.status === 429 || res.status >= 500)) {
       await new Promise((r) => setTimeout(r, retryDelayMs))
       res = await fetch(url, init)
     }

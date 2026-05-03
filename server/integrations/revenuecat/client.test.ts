@@ -74,9 +74,13 @@ describe('RevenueCatClient', () => {
       const client = createRevenueCatClient()
       await client.getCustomer('sk_test_xyz', 'app_x', 'u1')
 
-      const init = fetchMock.mock.calls[0][1] as RequestInit
-      const headers = init.headers as Record<string, string>
-      expect(headers['Authorization']).toBe('Bearer sk_test_xyz')
+      const projectsInit = fetchMock.mock.calls[0][1] as RequestInit
+      const projectsHeaders = projectsInit.headers as Record<string, string>
+      expect(projectsHeaders['Authorization']).toBe('Bearer sk_test_xyz')
+
+      const customerInit = fetchMock.mock.calls[1][1] as RequestInit
+      const customerHeaders = customerInit.headers as Record<string, string>
+      expect(customerHeaders['Authorization']).toBe('Bearer sk_test_xyz')
     })
 
     it('throws RevenueCatAuthError on 401 from /projects', async () => {
@@ -121,6 +125,18 @@ describe('RevenueCatClient', () => {
 
       const client = createRevenueCatClient({ retryDelayMs: 0 })
       await expect(client.getCustomer('sk_test', 'app_x', 'u1')).rejects.toThrow(/rate limit/i)
+    })
+
+    it('retries once on 503 and succeeds on the second attempt', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(200, { items: [{ id: 'p1' }] }))
+        .mockResolvedValueOnce(jsonResponse(503, {}))
+        .mockResolvedValueOnce(jsonResponse(200, { id: 'c1' }))
+
+      const client = createRevenueCatClient({ retryDelayMs: 0 })
+      const result = await client.getCustomer('sk_test', 'app_x', 'u1')
+      expect(result).toEqual({ id: 'c1' })
+      expect(fetchMock).toHaveBeenCalledTimes(3)
     })
   })
 
