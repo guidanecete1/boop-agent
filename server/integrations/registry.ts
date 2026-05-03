@@ -104,8 +104,9 @@ export async function seedProjectsIfEmpty(): Promise<void> {
 
 export async function loadIntegrations(): Promise<void> {
   await seedProjectsIfEmpty();
-  // Side-effect import: registers the 'projects' module in the registry.
+  // Side-effect imports: register custom integrations in the registry.
   await import("./projects/index.js");
+  await import("./revenuecat/index.js");
   const { registerComposioToolkits } = await import("./composio-loader.js");
   await registerComposioToolkits();
   const loaded = [...registry.keys()];
