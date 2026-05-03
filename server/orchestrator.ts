@@ -8,6 +8,7 @@ import { aggregateUsageFromResult, EMPTY_USAGE, type UsageTotals } from './usage
 import { getRuntimeModel } from './runtime-config.js'
 import { runPersonalAssistantExecutor } from './executors/personal-assistant.js'
 import { runIosExecutor } from './executors/ios.js'
+import { runWebExecutor } from './executors/web.js'
 import type { ExecutorType, ExecutorResult } from './executors/types.js'
 
 const ORCHESTRATOR_SYSTEM = `You are the Orchestrator. Your only job is to plan, route, and coordinate. You DO NOT execute work directly — you dispatch executors.
@@ -25,7 +26,7 @@ Routing rules:
 3. Pick executor_type based on the WORK, not the project type:
    - Code work in iOS-native project (mila, pepbuddy) → "ios"
    - Code work in Expo project → "expo"   [NOT YET IMPLEMENTED — Spec 4]
-   - Code work in Next.js / Vercel project → "web"   [NOT YET IMPLEMENTED — Spec 3]
+   - Code work in Next.js / Vercel project → "web"
    - Email / calendar / notes / web search / lookups → "personal-assistant"
    - ASO / paid ads / SEO / copy / brand → "marketing"   [NOT YET IMPLEMENTED — Spec 5]
    - Design critique / mockup gen → "design"   [NOT YET IMPLEMENTED — Spec 5]
@@ -108,8 +109,10 @@ async function dispatchExecutorImpl(input: {
     case 'ios':
       res = await runIosExecutor(opts)
       break
-    case 'expo':
     case 'web':
+      res = await runWebExecutor(opts)
+      break
+    case 'expo':
     case 'marketing':
     case 'design':
     case 'holafly':
