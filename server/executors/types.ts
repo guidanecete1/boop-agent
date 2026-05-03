@@ -3,6 +3,7 @@ export type ExecutorType =
   | 'ios'
   | 'expo'
   | 'web'
+  | 'db'
   | 'marketing'
   | 'design'
   | 'holafly'

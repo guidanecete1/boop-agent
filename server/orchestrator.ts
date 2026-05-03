@@ -9,6 +9,7 @@ import { getRuntimeModel } from './runtime-config.js'
 import { runPersonalAssistantExecutor } from './executors/personal-assistant.js'
 import { runIosExecutor } from './executors/ios.js'
 import { runWebExecutor } from './executors/web.js'
+import { runDbExecutor } from './executors/db.js'
 import type { ExecutorType, ExecutorResult } from './executors/types.js'
 
 const ORCHESTRATOR_SYSTEM = `You are the Orchestrator. Your only job is to plan, route, and coordinate. You DO NOT execute work directly — you dispatch executors.
@@ -27,6 +28,7 @@ Routing rules:
    - Code work in iOS-native project (mila, pepbuddy) → "ios"
    - Code work in Expo project → "expo"   [NOT YET IMPLEMENTED — Spec 4]
    - Code work in Next.js / Vercel project → "web"
+   - Database / schema / migrations / SQL / data queries / RevenueCat IAP / subs / metrics → "db"
    - Email / calendar / notes / web search / lookups → "personal-assistant"
    - ASO / paid ads / SEO / copy / brand → "marketing"   [NOT YET IMPLEMENTED — Spec 5]
    - Design critique / mockup gen → "design"   [NOT YET IMPLEMENTED — Spec 5]
@@ -45,8 +47,11 @@ Multi-executor coordination:
 - Dependent sub-tasks: serialize, with each dispatch's output informing the next.
 - Path-conflict rule: if two sub-tasks dispatch executors that resolve to the same project path, serialize them.
 
-Database access reminder (read but currently no executor uses it):
-- All projects access Supabase through Composio's Supabase toolkit. Each project (pepbuddy, mila, rosibel-clientes, rosibel-admin, rosibel-website) has its own connected_account under the same toolkit. When dispatching DB work, the executor must select the right connected_account_id based on which project the task is for.
+Database access — db-executor uses these:
+- All projects access Supabase through Composio's Supabase toolkit (multi-account: each project has its own connected_account_id stored in registry metadata.supabase_connected_account_id).
+- All projects access RevenueCat via the boop-revenuecat MCP (per-project env vars; project metadata stores revenuecat_api_key_env + revenuecat_app_id).
+- Pure DB / schema / migration tasks → dispatch executor_type='db' with the project_slug.
+- Cross-domain (UI + DB): dispatch db-executor first (run the migration), then dispatch web-executor (update the UI). Serial.
 
 Skill hint rule: when dispatching to a CC-subprocess executor, include in the task brief 1-3 most relevant Claude Code skills:
 - Multi-step code work → "use superpowers:writing-plans"
@@ -111,6 +116,9 @@ async function dispatchExecutorImpl(input: {
       break
     case 'web':
       res = await runWebExecutor(opts)
+      break
+    case 'db':
+      res = await runDbExecutor(opts)
       break
     case 'expo':
     case 'marketing':
