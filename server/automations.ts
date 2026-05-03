@@ -68,8 +68,8 @@ async function runAutomation(a: {
     });
 
     if (a.notifyConversationId && res.result) {
-      if (a.notifyConversationId.startsWith("sms:")) {
-        const number = a.notifyConversationId.slice(4);
+      if (a.notifyConversationId.startsWith("wa:")) {
+        const number = a.notifyConversationId.slice(3);
         const preamble = `[${a.name}]\n\n`;
         await sendMessage(number, preamble + res.result);
       }

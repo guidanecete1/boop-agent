@@ -288,6 +288,13 @@ export function ComposioSection({ isDark }: { isDark: boolean }) {
               message: err.error,
               setupUrl: err.setupUrl ?? COMPOSIO_DASHBOARD_URL,
             });
+            // Surface a toast too — the banner renders at the top of the
+            // panel and is easy to miss if the user is scrolled down on
+            // the toolkit row they just clicked. Without the toast they
+            // see no feedback and conclude the click did nothing.
+            showToast(
+              `${slug} needs a one-time BYO auth config — see banner at the top of the panel`,
+            );
             setBusy(null);
             return;
           }

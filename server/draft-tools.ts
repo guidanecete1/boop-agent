@@ -3,6 +3,7 @@ import { z } from "zod";
 import { api } from "../convex/_generated/api.js";
 import { convex } from "./convex-client.js";
 import { spawnExecutionAgent } from "./execution-agent.js";
+import { spawnOrchestrator } from "./orchestrator.js";
 
 function randomId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -99,6 +100,36 @@ export function createDraftDecisionMcp(conversationId: string) {
             draftId: args.draftId,
             status: "sent",
           });
+
+          // Detect orchestrator-style drafts (Spec 2+): if the payload JSON has
+          // an `executor_type` key, the draft was staged by the orchestrator. Re-spawn
+          // the orchestrator with previouslyDraftedRunId so it re-dispatches in
+          // execute mode.
+          let orchestratorPayload: { executor_type?: string; task?: string } = {};
+          try {
+            orchestratorPayload = JSON.parse(draft.payload);
+          } catch {
+            orchestratorPayload = {};
+          }
+
+          if (orchestratorPayload.executor_type) {
+            const res = await spawnOrchestrator({
+              task: orchestratorPayload.task ?? draft.summary,
+              conversationId,
+              previouslyDraftedRunId: args.draftId,
+            });
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `[orchestrator ${res.agentId} ${res.status}]\n\n${res.result}`,
+                },
+              ],
+            };
+          }
+
+          // Legacy path: execution-agent draft (e.g. an email send). Falls through to
+          // the existing spawnExecutionAgent call below.
           const task = `Execute this approved draft. Use the matching integration tool to actually send/create it.
 kind: ${draft.kind}
 summary: ${draft.summary}

@@ -273,11 +273,11 @@ async function recallPreferenceLines(): Promise<string[]> {
   }
 }
 
-// Bring whatever the user put in BOOP_USER_PHONE to E.164 (+1XXXXXXXXXX).
-// Without this, a bare 10-digit number in env produces an `sms:NNNNNNNNNN`
-// conversation that doesn't match the `sms:+1NNNNNNNNNN` ID Sendblue uses
-// for inbound messages from the same person — proactive notices end up in
-// a parallel Convex conversation invisible to the user-driven thread.
+// Bring whatever the user put in BOOP_USER_PHONE to E.164 (+<digits>).
+// Without this, a bare 10-digit number in env produces a `wa:NNNNNNNNNN`
+// conversation that doesn't match the `wa:+<E.164>` ID inbound WhatsApp
+// messages use for the same person — proactive notices would end up in a
+// parallel Convex conversation invisible to the user-driven thread.
 function normalizeProactivePhone(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -300,13 +300,13 @@ async function dispatchProactiveNotice(summary: string): Promise<void> {
     );
     return;
   }
-  const conversationId = `sms:${phone}`;
+  const conversationId = `wa:${phone}`;
   const reply = await handleUserMessage({
     conversationId,
     content: `[proactive notice] ${summary}`,
     kind: "proactive",
   });
-  // handleUserMessage only sends iMessage from inside send_ack; the final
+  // handleUserMessage only sends WhatsApp from inside send_ack; the final
   // reply is the caller's responsibility.
   if (reply && reply !== "(no reply)") {
     await sendMessage(phone, reply);

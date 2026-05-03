@@ -236,4 +236,54 @@ export default defineSchema({
   })
     .index("by_automation", ["automationId"])
     .index("by_run_id", ["runId"]),
+
+  projects: defineTable({
+    slug: v.string(),
+    displayName: v.string(),
+    type: v.union(
+      v.literal("ios-native"),
+      v.literal("expo"),
+      v.literal("nextjs-vercel"),
+      v.literal("growth-work"),
+    ),
+    path: v.optional(v.string()),
+    permission: v.union(
+      v.literal("read-only"),
+      v.literal("read-write"),
+      v.literal("full"),
+    ),
+    metadata: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    archived: v.optional(v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_type", ["type"]),
+
+  claudeCodeRuns: defineTable({
+    runId: v.string(),
+    projectSlug: v.string(),
+    parentExecutorRunId: v.optional(v.string()),
+    task: v.string(),
+    mode: v.union(v.literal("plan"), v.literal("execute")),
+    allowedTools: v.string(),
+    cwd: v.string(),
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("timeout"),
+      v.literal("cancelled"),
+    ),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    exitCode: v.optional(v.number()),
+    output: v.optional(v.string()),
+    error: v.optional(v.string()),
+    costUsd: v.optional(v.number()),
+  })
+    .index("by_run_id", ["runId"])
+    .index("by_project", ["projectSlug"])
+    .index("by_status", ["status"]),
 });

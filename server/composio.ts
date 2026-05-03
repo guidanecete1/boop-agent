@@ -43,6 +43,9 @@ export const CURATED_TOOLKITS: CuratedToolkit[] = [
   { slug: "salesforce", displayName: "Salesforce", authMode: "managed" },
   { slug: "twitter", displayName: "Twitter / X", authMode: "byo" },
   { slug: "linkedin", displayName: "LinkedIn", authMode: "managed" },
+  { slug: "vercel", displayName: "Vercel", authMode: "managed" },
+  { slug: "firecrawl", displayName: "Firecrawl", authMode: "managed" },
+  { slug: "elevenlabs", displayName: "ElevenLabs", authMode: "managed" },
 ];
 
 const DISPLAY_NAME_BY_SLUG = new Map(CURATED_TOOLKITS.map((t) => [t.slug, t.displayName]));
@@ -334,9 +337,27 @@ export async function listConnectedToolkits(): Promise<ConnectedToolkit[]> {
   const composio = getComposio();
   if (!composio) return [];
   try {
-    const resp = await composio.connectedAccounts.list({ userIds: [boopUserId()] });
+    // Composio's connected_accounts API paginates at ~10 items per page.
+    // Without cursor-loop pagination, accounts with 11+ connections lose
+    // visibility on the oldest ones — they silently drop off page 1 as
+    // newer connections are added, which presents in the dashboard as
+    // "connection disappeared" even though it's still ACTIVE on Composio's
+    // side. Walk every page so listConnectedToolkits returns all of them.
+    const firstResp = await composio.connectedAccounts.list({
+      userIds: [boopUserId()],
+    });
+    const allItems = [...firstResp.items];
+    let cursor: string | null | undefined = firstResp.nextCursor ?? null;
+    while (cursor) {
+      const next = await composio.connectedAccounts.list({
+        userIds: [boopUserId()],
+        cursor,
+      });
+      allItems.push(...next.items);
+      cursor = next.nextCursor ?? null;
+    }
     const enriched = await Promise.all(
-      resp.items.map(async (it) => {
+      allItems.map(async (it) => {
         const seed = extractAccountIdentity(
           (it as { state?: unknown }).state,
           (it as { data?: unknown }).data,
@@ -494,13 +515,17 @@ export async function authorizeToolkit(
     }
   }
 
-  // 2. Initiate the connection. allowMultiple if there's already an active connection
-  //    so we add another account instead of replacing.
-  const existing = (await listConnectedToolkits()).filter(
-    (c) => c.slug === slug && c.status === "ACTIVE",
-  );
+  // 2. Initiate the connection. Always allowMultiple — adding another account
+  //    is always the right intent here (the dashboard's connect button is "+
+  //    add account", not "replace"). Composio rejects unless allowMultiple is
+  //    set whenever ANY existing connection exists at this auth config — even
+  //    in non-ACTIVE statuses like INITIATED / INITIALIZING — so trying to
+  //    auto-detect from ACTIVE-only existence is brittle and broke for users
+  //    with multiple Google Calendar / Gmail accounts. YAGNI on the
+  //    "don't-allow-multiple" path; reintroduce a guard if a real use case
+  //    appears.
   const conn = await composio.connectedAccounts.initiate(boopUserId(), authConfigId, {
-    ...(existing.length > 0 ? { allowMultiple: true } : {}),
+    allowMultiple: true,
     ...(opts?.callbackUrl ? { callbackUrl: opts.callbackUrl } : {}),
     ...(opts?.alias ? { alias: opts.alias } : {}),
   });
