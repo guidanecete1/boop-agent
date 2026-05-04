@@ -40,8 +40,8 @@ export const EXECUTOR_TYPES = [
   'ios',
   'web',
   'db',
-  // Not yet implemented — dispatching one returns a stub error:
   'expo',
+  // Not yet implemented — dispatching one returns a stub error:
   'marketing',
   'design',
   'holafly',

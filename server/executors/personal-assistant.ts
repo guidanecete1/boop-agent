@@ -21,7 +21,11 @@ export async function runPersonalAssistantExecutor(
   //                   the correct routing — PA literally cannot query the DB
   //                   directly, so the orchestrator must compose db + PA for
   //                   any task that needs both (e.g. "query then email").
-  const SPECIAL_INTEGRATIONS = new Set(['projects', 'revenuecat', 'supabase'])
+  //   'asc'         — App Store Connect is loaded directly by the ios + expo
+  //                   executors (boop-asc MCP). Excluding it from PA keeps
+  //                   "TestFlight build status" / "ASC app list" routing
+  //                   pinned to the executor that owns the build pipeline.
+  const SPECIAL_INTEGRATIONS = new Set(['projects', 'revenuecat', 'supabase', 'asc'])
   const integrations = availableIntegrations().filter((n) => !SPECIAL_INTEGRATIONS.has(n))
   const res = await spawnExecutionAgent({
     task: opts.task,

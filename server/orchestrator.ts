@@ -10,6 +10,7 @@ import { runPersonalAssistantExecutor } from './executors/personal-assistant.js'
 import { runIosExecutor } from './executors/ios.js'
 import { runWebExecutor } from './executors/web.js'
 import { runDbExecutor } from './executors/db.js'
+import { runExpoExecutor } from './executors/expo.js'
 import { EXECUTOR_TYPES, type ExecutorType, type ExecutorResult } from './executors/types.js'
 
 const ORCHESTRATOR_SYSTEM = `You are the Orchestrator. Your only job is to plan, route, and coordinate. You DO NOT execute work directly — you dispatch executors.
@@ -26,7 +27,7 @@ Routing rules:
 2. Decompose multi-step / multi-domain tasks into sub-tasks. Each sub-task gets ONE executor.
 3. Pick executor_type based on the WORK, not the project type:
    - Code work in iOS-native project (mila, pepbuddy) → "ios"  (project type MUST be "ios-native")
-   - Code work in Expo project → "expo"   [NOT YET IMPLEMENTED — Spec 4]  (project type MUST be "expo")
+   - Code work in Expo project (rosibel-clientes) → "expo"  (project type MUST be "expo")
    - Code work in Next.js / Vercel project → "web"  (project type MUST be "nextjs-vercel")
    - Database / schema / migrations / SQL / data queries / "how many X are in Y", row counts, anything that requires running SQL against a project's Supabase / RevenueCat IAP / subs / metrics → "db"
    - Email / calendar / notes / web search / contact lookups (NOT DB lookups) → "personal-assistant"
@@ -159,6 +160,8 @@ async function dispatchExecutorImpl(input: {
       res = await runDbExecutor(opts)
       break
     case 'expo':
+      res = await runExpoExecutor(opts)
+      break
     case 'marketing':
     case 'design':
     case 'holafly':
