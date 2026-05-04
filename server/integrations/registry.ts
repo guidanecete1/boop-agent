@@ -112,6 +112,7 @@ export async function loadIntegrations(): Promise<void> {
   // Side-effect imports: register custom integrations in the registry.
   await import("./projects/index.js");
   await import("./revenuecat/index.js");
+  await import("./asc/index.js");
   const { registerComposioToolkits } = await import("./composio-loader.js");
   await registerComposioToolkits();
   const loaded = [...registry.keys()];
