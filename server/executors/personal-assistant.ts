@@ -6,9 +6,11 @@ export async function runPersonalAssistantExecutor(
 ): Promise<ExecutorResult> {
   // For personal-assistant work, load every connected Composio integration.
   // The execution-agent itself adds WebSearch + WebFetch.
-  // 'projects' is excluded — that integration is loaded selectively by
-  // CC-subprocess executors (ios, etc.).
-  const integrations = availableIntegrations().filter((n) => n !== 'projects')
+  // Excluded: 'projects' (selectively loaded by CC-subprocess executors)
+  // and 'revenuecat' (loaded directly by db-executor — its createServer
+  // intentionally throws when reached via buildMcpServersForIntegrations).
+  const SPECIAL_INTEGRATIONS = new Set(['projects', 'revenuecat'])
+  const integrations = availableIntegrations().filter((n) => !SPECIAL_INTEGRATIONS.has(n))
   const res = await spawnExecutionAgent({
     task: opts.task,
     integrations,
