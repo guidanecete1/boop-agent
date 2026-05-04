@@ -31,10 +31,9 @@ Mode discipline:
   ONLY destructive ops not covered above (e.g. \`vercel --prod\` to a production domain, \`git push --force\`, \`gh pr merge\`) require save_draft. Routine commit + push + open-PR + preview deploy are pre-confirmed by execute mode itself.
 
 Tool selection:
-- Code edits → run_in_project (CC subprocess in the project's cwd, with Skill, Read, Write, Edit, Glob, Grep, Bash).
-- For project-bound PR creation, prefer 'gh pr create' inside run_in_project (single CC turn, end-to-end). Composio's GitHub toolkit (mcp__github__*) is reserved for cross-project / non-code GitHub queries from the personal-assistant executor.
-- For Vercel deploys: prefer the Composio Vercel toolkit (mcp__vercel__*) for deploy / list deployments / get deployment status. If Composio's Vercel surface doesn't expose preview-with-URL-return, fall back to letting Vercel's GitHub integration auto-build a preview when the PR opens, and read the preview URL from the GitHub PR's checks API via gh.
-- For Supabase queries that come up incidentally during UI work: use mcp__supabase__*. If the work is pure DB (schema migrations, RLS, data ops with no UI half), tell the orchestrator and stop — re-route to db-executor.
+- Code edits, git, gh, and any local CLI → run_in_project (CC subprocess in the project's cwd, with Skill, Read, Write, Edit, Glob, Grep, Bash). PR creation = 'gh pr create' inside run_in_project. You do NOT have a Composio github MCP here by design.
+- For Vercel deploys: use the Composio Vercel toolkit (mcp__vercel__*) for deploy / list deployments / get deployment status. If Composio's Vercel surface doesn't expose preview-with-URL-return, fall back to letting Vercel's GitHub integration auto-build a preview when the PR opens, and read the preview URL via 'gh pr view --json statusCheckRollup' inside run_in_project.
+- You do NOT have direct Supabase access. ANY task that requires reading or writing the database — even a single SELECT for context — must end with a HANDOFF_TO: db block (see below). Do not attempt to query the database yourself or instruct the user to do it manually.
 
 Cross-domain handoff (CRITICAL):
 - If your code change requires a Supabase schema change (e.g. you changed a column type in code, the production schema doesn't match), you MUST end your reply with a clearly marked block:
@@ -89,8 +88,19 @@ export async function runWebExecutor(opts: ExecutorOpts): Promise<ExecutorResult
     parentExecutorRunId: runId,
   })
   const draftServer = createDraftStagingMcp(opts.conversationId)
+  // Web-executor's Composio surface intentionally narrow:
+  //   vercel  — deploy / list deployments / read preview URLs
+  // Excluded by design:
+  //   github   — PR creation happens via `gh` CLI inside run_in_project,
+  //              not the Composio github MCP. The mcp__github__* surface
+  //              is reserved for cross-project / non-code queries via
+  //              personal-assistant.
+  //   supabase — DB work belongs to db-executor (code-level enforcement
+  //              of the routing rule, same pattern as personal-assistant).
+  //              Cross-domain "edit UI + read DB" tasks compose db→web in
+  //              two dispatches; the orchestrator handles the chain.
   const composioServers = await buildMcpServersForIntegrations(
-    ['vercel', 'github', 'supabase'],
+    ['vercel'],
     opts.conversationId,
   )
 
