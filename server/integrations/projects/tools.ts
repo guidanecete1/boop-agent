@@ -5,6 +5,7 @@ import { convex } from '../../convex-client.js'
 import { broadcast } from '../../broadcast.js'
 import { runCcSubprocess } from './cc-subprocess.js'
 import { clampAllowedTools, type Permission } from './permission-clamp.js'
+import { EXECUTOR_TYPES } from '../../executors/types.js'
 
 const MODE_DEFAULTS = {
   plan: 'Skill,Read,Grep,Glob,Bash(echo:*),Bash(ls:*),Bash(git status:*),Bash(git log:*),Bash(git diff:*)',
@@ -111,16 +112,11 @@ mode:
 
 Returns the executor's final output. For destructive multi-step tasks, dispatch with mode='plan' first, then stage a draft of the plan via save_draft.`,
         {
-          executor_type: z.enum([
-            'personal-assistant',
-            'ios',
-            'web',
-            'db',
-            'expo',
-            'marketing',
-            'design',
-            'holafly',
-          ]),
+          // Schema is derived from the single source of truth in
+          // server/executors/types.ts so it can never drift from the
+          // ExecutorType TS union. When you add a new executor type,
+          // update EXECUTOR_TYPES there + the description text above.
+          executor_type: z.enum(EXECUTOR_TYPES),
           task: z.string(),
           project_slug: z.string().optional(),
           mode: z.enum(['plan', 'execute']).optional(),

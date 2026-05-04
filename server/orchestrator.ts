@@ -10,7 +10,7 @@ import { runPersonalAssistantExecutor } from './executors/personal-assistant.js'
 import { runIosExecutor } from './executors/ios.js'
 import { runWebExecutor } from './executors/web.js'
 import { runDbExecutor } from './executors/db.js'
-import type { ExecutorType, ExecutorResult } from './executors/types.js'
+import { EXECUTOR_TYPES, type ExecutorType, type ExecutorResult } from './executors/types.js'
 
 const ORCHESTRATOR_SYSTEM = `You are the Orchestrator. Your only job is to plan, route, and coordinate. You DO NOT execute work directly — you dispatch executors.
 
@@ -134,6 +134,15 @@ async function dispatchExecutorImpl(input: {
     mode: input.mode,
     previouslyDraftedRunId: input.previouslyDraftedRunId,
   }
+  // Reject unknown types coming off the wire BEFORE narrowing to ExecutorType.
+  // The exhaustive switch below relies on `t` being a member of the union.
+  if (!(EXECUTOR_TYPES as readonly string[]).includes(input.executorType)) {
+    return {
+      runId: randomId('stub'),
+      output: `Unknown executor type "${input.executorType}".`,
+      status: 'failed',
+    }
+  }
   const t = input.executorType as ExecutorType
   let res: ExecutorResult
   switch (t) {
@@ -158,12 +167,14 @@ async function dispatchExecutorImpl(input: {
         output: `Executor type "${t}" is not yet implemented. Coming in a later spec.`,
         status: 'failed',
       }
-    default:
-      return {
-        runId: randomId('stub'),
-        output: `Unknown executor type "${input.executorType}".`,
-        status: 'failed',
-      }
+    default: {
+      // Compile-time exhaustiveness guard. If a new ExecutorType is added
+      // to EXECUTOR_TYPES (server/executors/types.ts) without a `case`
+      // branch above, TypeScript fails to build here because `t` will not
+      // narrow to `never`. See the checklist comment in types.ts.
+      const _exhaustive: never = t
+      throw new Error(`Unhandled executor type: ${String(_exhaustive)}`)
+    }
   }
   return {
     runId: res.runId,
