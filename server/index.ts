@@ -7,6 +7,10 @@ import { addClient, broadcast } from "./broadcast.js";
 import { handleUserMessage } from "./interaction-agent.js";
 import { initWhatsApp } from "./whatsapp.js";
 import { setMessenger } from "./messaging.js";
+import {
+  startBuildJobsTick,
+  setBuildJobsConversationLookup,
+} from "./build-jobs/tick.js";
 import { api } from "../convex/_generated/api.js";
 import { convex } from "./convex-client.js";
 import { loadIntegrations } from "./integrations/registry.js";
@@ -132,6 +136,17 @@ async function main() {
     allowedNumbers,
   });
   setMessenger(wa);
+
+  // Build-jobs tick (Spec 4): polls Convex every ~30s for running buildJobs,
+  // sends 5-min heartbeats + completion pings via the messenger registered above.
+  // Conversation IDs in Boop's WhatsApp transport use the "wa:<E.164>" prefix.
+  setBuildJobsConversationLookup({
+    resolveRecipient: (conversationId: string): string | undefined => {
+      if (conversationId.startsWith("wa:")) return conversationId.slice(3);
+      return undefined;
+    },
+  });
+  startBuildJobsTick();
 
   wa.onMessage(async (msg) => {
     const conversationId = `wa:${msg.fromE164}`;
