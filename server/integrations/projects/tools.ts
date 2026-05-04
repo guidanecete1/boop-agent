@@ -95,22 +95,28 @@ export function createProjectsMcp(opts: ProjectsMcpOptions) {
         'dispatch_executor',
         `Dispatch a typed executor agent to handle a sub-task.
 
-executor_type:
-- "personal-assistant" — in-process, Composio + WebSearch + WebFetch. For email, calendar, notes, lookups.
-- "ios" — CC subprocess in iOS-native projects (mila, pepbuddy). For Swift / Xcode / Fastlane work.
-- "expo" / "web" / "marketing" / "design" / "holafly" — NOT YET IMPLEMENTED in Spec 2; will return an error.
+executor_type (IMPLEMENTED):
+- "personal-assistant" — in-process, Composio (NO supabase / NO revenuecat by design) + WebSearch + WebFetch. For email, calendar, notes, contacts, web lookups. NOT for SQL or DB queries.
+- "ios" — CC subprocess in iOS-native projects (mila, pepbuddy). For Swift / Xcode / Fastlane work. Project type must be "ios-native".
+- "web" — CC subprocess in Next.js / Vercel projects (rosibel-admin, rosibel-website). For Next.js code edits, Vercel deploys, project-bound PRs via gh CLI. Project type must be "nextjs-vercel". Has NO supabase access — DB work belongs to "db".
+- "db" — cross-project DB executor. Has Supabase (Composio multi-account) + RevenueCat (boop-revenuecat MCP). For SQL queries / schema / migrations / row counts / RC subscriptions / RC metrics. Pass project_slug so it can resolve the right connected_account_id and RC env-var name from registry metadata. Use this for "how many X are in Y" style questions even if the project happens to be a Next.js app.
+
+executor_type (NOT YET IMPLEMENTED, will return an error if dispatched — surface as roadmap gap instead):
+- "expo" — Spec 4 (rosibel-clientes Expo app)
+- "marketing" / "design" / "holafly" — Spec 5
 
 mode:
 - "plan" — read-only investigation; outputs a textual plan
-- "execute" — full work, with destructive operations gated by allowed_tools / permission
+- "execute" — full work end-to-end (commits + pushes + deploys for code work; SQL execution for db work). Destructive ops gated by allowed_tools / project permission / save_draft when the orchestrator has not pre-confirmed.
 
 Returns the executor's final output. For destructive multi-step tasks, dispatch with mode='plan' first, then stage a draft of the plan via save_draft.`,
         {
           executor_type: z.enum([
             'personal-assistant',
             'ios',
-            'expo',
             'web',
+            'db',
+            'expo',
             'marketing',
             'design',
             'holafly',
