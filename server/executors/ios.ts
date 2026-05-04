@@ -4,6 +4,8 @@ import { convex } from '../convex-client.js'
 import { broadcast } from '../broadcast.js'
 import { createDraftStagingMcp } from '../draft-tools.js'
 import { createProjectsMcp } from '../integrations/projects/tools.js'
+import { createAscMcp } from '../integrations/asc/tools.js'
+import { createFastlaneMcp } from '../integrations/fastlane/tools.js'
 import { aggregateUsageFromResult, EMPTY_USAGE, type UsageTotals } from '../usage.js'
 import { getRuntimeModel } from '../runtime-config.js'
 import type { ExecutorOpts, ExecutorResult } from './types.js'
@@ -35,6 +37,14 @@ Filesystem discipline (IMPORTANT):
 
 You cannot dispatch other executors. If the orchestrator gave you a non-iOS task, return an error so the orchestrator re-routes.
 
+Tool surface:
+- run_in_project (CC subprocess) — code edits, git, gh, Xcode CLI, anything local in the project's build_root.
+- mcp__boop-asc__* — App Store Connect READ tools: list apps, list builds for a bundle_id, get a specific build, get the latest build (often used to verify TestFlight processing completion). Read-only.
+- mcp__boop-fastlane__list_lanes — list available lanes in the project's Fastfile.
+- mcp__boop-fastlane__run_lane — RUN a lane (e.g. 'beta' to upload to TestFlight). LONG-RUNNING (3-10 min). FIRE-AND-FORGET — call run_lane, get { jobId, status: "running" } back, then immediately reply to the user with a short message like "On it 🛠️ — building Mila for TestFlight (~5-10 min)". DO NOT block waiting; the buildJobs tick handles WhatsApp completion notification automatically.
+
+When you call run_lane, you MUST pass executor_run_id and conversation_id (the orchestrator gives you these via opts).
+
 Output style:
 - Concise. Under 400 words.
 - Lead with the artifact (PR URL, commit SHA, etc.) when applicable.
@@ -57,7 +67,7 @@ export async function runIosExecutor(opts: ExecutorOpts): Promise<ExecutorResult
     conversationId: opts.conversationId,
     name: 'ios-executor',
     task: opts.task,
-    mcpServers: ['projects'],
+    mcpServers: ['projects', 'asc', 'fastlane'],
   })
   await convex.mutation(api.agents.update, { agentId: runId, status: 'running' })
   broadcast('agent_spawned', { agentId: runId, name: 'ios-executor', task: opts.task })
@@ -67,12 +77,20 @@ export async function runIosExecutor(opts: ExecutorOpts): Promise<ExecutorResult
     parentExecutorRunId: runId,
   })
   const draftServer = createDraftStagingMcp(opts.conversationId)
+  const ascServer = createAscMcp()
+  const fastlaneServer = createFastlaneMcp()
 
   const allowedTools = [
     'mcp__boop-projects__list_projects',
     'mcp__boop-projects__get_project',
     'mcp__boop-projects__run_in_project',
     'mcp__boop-drafts__save_draft',
+    'mcp__boop-asc__list_apps',
+    'mcp__boop-asc__list_builds',
+    'mcp__boop-asc__get_build',
+    'mcp__boop-asc__get_latest_build',
+    'mcp__boop-fastlane__list_lanes',
+    'mcp__boop-fastlane__run_lane',
   ]
 
   const taskBrief = [
@@ -80,6 +98,8 @@ export async function runIosExecutor(opts: ExecutorOpts): Promise<ExecutorResult
       ? `Target project: ${opts.projectSlug}`
       : 'No specific project; the orchestrator may have erred — fail loudly.',
     `Mode: ${opts.mode ?? 'execute'}`,
+    `Your runId (pass as executor_run_id when calling run_lane): ${runId}`,
+    `Your conversationId (pass as conversation_id when calling run_lane): ${opts.conversationId}`,
     opts.previouslyDraftedRunId
       ? `Previously drafted plan run id: ${opts.previouslyDraftedRunId} — execute it.`
       : '',
@@ -106,6 +126,8 @@ export async function runIosExecutor(opts: ExecutorOpts): Promise<ExecutorResult
         mcpServers: {
           'boop-projects': projectsServer,
           'boop-drafts': draftServer,
+          'boop-asc': ascServer,
+          'boop-fastlane': fastlaneServer,
         },
         allowedTools,
         // Skill discovery happens inside the CC subprocess (via claude -p),
