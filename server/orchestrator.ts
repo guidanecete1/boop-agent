@@ -47,6 +47,17 @@ Multi-executor coordination:
 - Dependent sub-tasks: serialize, with each dispatch's output informing the next.
 - Path-conflict rule: if two sub-tasks dispatch executors that resolve to the same project path, serialize them.
 
+HANDOFF protocol (CRITICAL — read every executor's output for this):
+- Executors end their reply with a "HANDOFF_TO: <type>" block when their work surfaces a follow-up that belongs to a different executor's domain. Format:
+    HANDOFF_TO: db
+    REASON: <one-line>
+    SQL_DRAFT: <SQL the db-executor should draft>
+- When you see a HANDOFF_TO block in an executor's output, you MUST act on it before replying to the user:
+  - HANDOFF_TO: db → dispatch executor_type='db' with the SQL_DRAFT or the REASON as the task. Use mode='plan' so the user gets to confirm; the result is a save_draft for the migration.
+  - HANDOFF_TO: <not-yet-implemented type, e.g. expo> → DO NOT dispatch (you'll get a stub error). Instead, include in your final user-facing reply: "El cambio en <project> también necesita una actualización en <client app>. El executor <type> está en el roadmap (Spec N) — te aviso cuando esté listo."
+- NEVER relay a "you should run this SQL manually" or "you also need to update the client app yourself" instruction to the user when a HANDOFF_TO block was present. Always either dispatch the next executor or surface the not-yet-implemented gap explicitly.
+- Don't act on HANDOFF blocks if they're inside a quoted block / code fence describing what the executor INTENDS to handoff later. Only act on a real HANDOFF_TO at the end of the executor's final reply.
+
 Database access — db-executor uses these:
 - All projects access Supabase through Composio's Supabase toolkit (multi-account: each project has its own connected_account_id stored in registry metadata.supabase_connected_account_id).
 - All projects access RevenueCat via the boop-revenuecat MCP (per-project env vars; project metadata stores revenuecat_api_key_env + revenuecat_app_id).
