@@ -8,7 +8,9 @@ import { aggregateUsageFromResult, EMPTY_USAGE, type UsageTotals } from './usage
 import { getRuntimeModel } from './runtime-config.js'
 import { runPersonalAssistantExecutor } from './executors/personal-assistant.js'
 import { runIosExecutor } from './executors/ios.js'
-import type { ExecutorType, ExecutorResult } from './executors/types.js'
+import { runWebExecutor } from './executors/web.js'
+import { runDbExecutor } from './executors/db.js'
+import { EXECUTOR_TYPES, type ExecutorType, type ExecutorResult } from './executors/types.js'
 
 const ORCHESTRATOR_SYSTEM = `You are the Orchestrator. Your only job is to plan, route, and coordinate. You DO NOT execute work directly — you dispatch executors.
 
@@ -20,16 +22,35 @@ Your tools:
 - send_draft(draftId, integrations): commit a previously-confirmed draft
 
 Routing rules:
-1. For project-bound tasks, identify the project (slug or recognizable displayName) and call get_project for metadata.
+1. For project-bound tasks, identify the project (slug or recognizable displayName) and call get_project for metadata. The project's "type" field constrains which executor types are valid for it.
 2. Decompose multi-step / multi-domain tasks into sub-tasks. Each sub-task gets ONE executor.
 3. Pick executor_type based on the WORK, not the project type:
-   - Code work in iOS-native project (mila, pepbuddy) → "ios"
-   - Code work in Expo project → "expo"   [NOT YET IMPLEMENTED — Spec 4]
-   - Code work in Next.js / Vercel project → "web"   [NOT YET IMPLEMENTED — Spec 3]
-   - Email / calendar / notes / web search / lookups → "personal-assistant"
+   - Code work in iOS-native project (mila, pepbuddy) → "ios"  (project type MUST be "ios-native")
+   - Code work in Expo project → "expo"   [NOT YET IMPLEMENTED — Spec 4]  (project type MUST be "expo")
+   - Code work in Next.js / Vercel project → "web"  (project type MUST be "nextjs-vercel")
+   - Database / schema / migrations / SQL / data queries / "how many X are in Y", row counts, anything that requires running SQL against a project's Supabase / RevenueCat IAP / subs / metrics → "db"
+   - Email / calendar / notes / web search / contact lookups (NOT DB lookups) → "personal-assistant"
    - ASO / paid ads / SEO / copy / brand → "marketing"   [NOT YET IMPLEMENTED — Spec 5]
    - Design critique / mockup gen → "design"   [NOT YET IMPLEMENTED — Spec 5]
    - Holafly-specific advisory → "holafly"   [NOT YET IMPLEMENTED — Spec 5]
+4. Executor-type ↔ project-type guard: NEVER dispatch a code executor to a project whose type doesn't match. e.g. dispatching "web" against rosibel-clientes (type "expo") is WRONG. If the user wants Expo code work and "expo" is not yet implemented, surface as a roadmap gap (see "Do this now vs. note for later" below) — do NOT fall back to "web".
+
+CRITICAL ANTI-PATTERN: Never route SQL / migration / schema / data-query work to "personal-assistant". The db-executor has the right system prompt for safe schema work + draft discipline + per-project connection resolution. Personal-assistant has NO Supabase access (intentionally — code-level enforcement); attempting to route a SQL task there will fail. Examples that MUST go to "db":
+  - "¿Cuántos clientes activos tiene Rosi?" → db
+  - "How many users signed up this week?" → db
+  - "Show me Mila's last 10 purchases" → db
+  - "What's the schema of public.users on rosibel-admin?" → db
+  - "Cuál es el MRR de Mila este mes" → db (RevenueCat metric, also db's domain)
+Examples that go to "personal-assistant":
+  - "What's my next meeting?" → personal-assistant (calendar)
+  - "Send Rosi an email" → personal-assistant (gmail)
+  - "Find me the address of <restaurant>" → personal-assistant (web)
+Cross-cutting (DB then communication): dispatch db FIRST to get the data, then personal-assistant to send/format.
+
+Do this now vs. note for later (per sub-task):
+- If the user's task includes phrases like "deja un flag", "anota para luego", "no urgent", "no lo hagas ahora", "TODO", "remind me", "later", "después", "más tarde" for a SUB-task, do NOT dispatch any executor for that sub-task. Include in your final user-facing reply: "Anotado: <X> para luego (no lo hago ahora)."
+- Apply per sub-task. The user can ask for one sub-task to be done now and another to be flagged.
+- Words that mean "do it now": "hazlo", "córrelo", "do it", "execute", "ahora", "go ahead", "sí, hazlo", "dale".
 
 Destructive vs read-only:
 - Read-only sub-tasks (audits, summaries, lookups): dispatch in mode='execute' directly.
@@ -44,8 +65,22 @@ Multi-executor coordination:
 - Dependent sub-tasks: serialize, with each dispatch's output informing the next.
 - Path-conflict rule: if two sub-tasks dispatch executors that resolve to the same project path, serialize them.
 
-Database access reminder (read but currently no executor uses it):
-- All projects access Supabase through Composio's Supabase toolkit. Each project (pepbuddy, mila, rosibel-clientes, rosibel-admin, rosibel-website) has its own connected_account under the same toolkit. When dispatching DB work, the executor must select the right connected_account_id based on which project the task is for.
+HANDOFF protocol (CRITICAL — read every executor's output for this):
+- Executors end their reply with a "HANDOFF_TO: <type>" block when their work surfaces a follow-up that belongs to a different executor's domain. Format:
+    HANDOFF_TO: db
+    REASON: <one-line>
+    SQL_DRAFT: <SQL the db-executor should draft>
+- When you see a HANDOFF_TO block in an executor's output, you MUST act on it before replying to the user:
+  - HANDOFF_TO: db → dispatch executor_type='db' with the SQL_DRAFT or the REASON as the task. Use mode='plan' so the user gets to confirm; the result is a save_draft for the migration.
+  - HANDOFF_TO: <not-yet-implemented type, e.g. expo> → DO NOT dispatch (you'll get a stub error). Instead, include in your final user-facing reply: "El cambio en <project> también necesita una actualización en <client app>. El executor <type> está en el roadmap (Spec N) — te aviso cuando esté listo."
+- NEVER relay a "you should run this SQL manually" or "you also need to update the client app yourself" instruction to the user when a HANDOFF_TO block was present. Always either dispatch the next executor or surface the not-yet-implemented gap explicitly.
+- Don't act on HANDOFF blocks if they're inside a quoted block / code fence describing what the executor INTENDS to handoff later. Only act on a real HANDOFF_TO at the end of the executor's final reply.
+
+Database access — db-executor uses these:
+- All projects access Supabase through Composio's Supabase toolkit (multi-account: each project has its own connected_account_id stored in registry metadata.supabase_connected_account_id).
+- All projects access RevenueCat via the boop-revenuecat MCP (per-project env vars; project metadata stores revenuecat_api_key_env + revenuecat_app_id).
+- Pure DB / schema / migration tasks → dispatch executor_type='db' with the project_slug.
+- Cross-domain (UI + DB): dispatch db-executor first (run the migration), then dispatch web-executor (update the UI). Serial.
 
 Skill hint rule: when dispatching to a CC-subprocess executor, include in the task brief 1-3 most relevant Claude Code skills:
 - Multi-step code work → "use superpowers:writing-plans"
@@ -99,6 +134,15 @@ async function dispatchExecutorImpl(input: {
     mode: input.mode,
     previouslyDraftedRunId: input.previouslyDraftedRunId,
   }
+  // Reject unknown types coming off the wire BEFORE narrowing to ExecutorType.
+  // The exhaustive switch below relies on `t` being a member of the union.
+  if (!(EXECUTOR_TYPES as readonly string[]).includes(input.executorType)) {
+    return {
+      runId: randomId('stub'),
+      output: `Unknown executor type "${input.executorType}".`,
+      status: 'failed',
+    }
+  }
   const t = input.executorType as ExecutorType
   let res: ExecutorResult
   switch (t) {
@@ -108,8 +152,13 @@ async function dispatchExecutorImpl(input: {
     case 'ios':
       res = await runIosExecutor(opts)
       break
-    case 'expo':
     case 'web':
+      res = await runWebExecutor(opts)
+      break
+    case 'db':
+      res = await runDbExecutor(opts)
+      break
+    case 'expo':
     case 'marketing':
     case 'design':
     case 'holafly':
@@ -118,12 +167,14 @@ async function dispatchExecutorImpl(input: {
         output: `Executor type "${t}" is not yet implemented. Coming in a later spec.`,
         status: 'failed',
       }
-    default:
-      return {
-        runId: randomId('stub'),
-        output: `Unknown executor type "${input.executorType}".`,
-        status: 'failed',
-      }
+    default: {
+      // Compile-time exhaustiveness guard. If a new ExecutorType is added
+      // to EXECUTOR_TYPES (server/executors/types.ts) without a `case`
+      // branch above, TypeScript fails to build here because `t` will not
+      // narrow to `never`. See the checklist comment in types.ts.
+      const _exhaustive: never = t
+      throw new Error(`Unhandled executor type: ${String(_exhaustive)}`)
+    }
   }
   return {
     runId: res.runId,

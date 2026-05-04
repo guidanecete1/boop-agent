@@ -61,10 +61,15 @@ const SEED_PROJECTS = [
     metadata: JSON.stringify({ supabase_access: "mcp" }),
   },
   {
+    // rosibel-admin and rosibel-website live in the SAME Next.js repo
+    // (guidanecete1/v0-personal-trainer-website). The repo contains the
+    // public website AND the /admin/** routes. Both slugs point at the
+    // same path on disk; the difference is just which surface the agent
+    // is being asked to touch.
     slug: "rosibel-admin",
     displayName: "Rosibel Admin (Next.js)",
     type: "nextjs-vercel" as const,
-    path: "/Users/Alfredo/Documents/AI Varios/Rosibel Avila",
+    path: "/Users/Alfredo/Documents/AI Varios/Rosibel Avila/v0-personal-trainer-website",
     permission: "full" as const,
     metadata: JSON.stringify({ supabase_access: "mcp" }),
   },
@@ -72,7 +77,7 @@ const SEED_PROJECTS = [
     slug: "rosibel-website",
     displayName: "Rosibel Website (Next.js)",
     type: "nextjs-vercel" as const,
-    path: "/Users/Alfredo/Documents/AI Varios/Rosibel Avila",
+    path: "/Users/Alfredo/Documents/AI Varios/Rosibel Avila/v0-personal-trainer-website",
     permission: "full" as const,
     metadata: JSON.stringify({ supabase_access: "mcp" }),
   },
@@ -104,8 +109,9 @@ export async function seedProjectsIfEmpty(): Promise<void> {
 
 export async function loadIntegrations(): Promise<void> {
   await seedProjectsIfEmpty();
-  // Side-effect import: registers the 'projects' module in the registry.
+  // Side-effect imports: register custom integrations in the registry.
   await import("./projects/index.js");
+  await import("./revenuecat/index.js");
   const { registerComposioToolkits } = await import("./composio-loader.js");
   await registerComposioToolkits();
   const loaded = [...registry.keys()];
