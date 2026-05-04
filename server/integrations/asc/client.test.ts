@@ -117,6 +117,31 @@ describe('AscClient', () => {
       expect(url2).toContain('filter%5Bapp%5D=app_pep')
     })
 
+    it('parallel resolveAppId calls share a single /v1/apps fetch', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(200, {
+            data: [
+              { id: 'app_a', attributes: { bundleId: 'com.a', name: 'A', sku: 'a', primaryLocale: 'en-US' } },
+              { id: 'app_b', attributes: { bundleId: 'com.b', name: 'B', sku: 'b', primaryLocale: 'en-US' } },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(200, { data: [] }))
+        .mockResolvedValueOnce(jsonResponse(200, { data: [] }))
+
+      const client = createAscClient(defaultOpts())
+      // Fire two listBuilds in parallel for different bundles before any
+      // resolution has completed. Both should share one /v1/apps fetch.
+      await Promise.all([
+        client.listBuilds('com.a', { limit: 1 }),
+        client.listBuilds('com.b', { limit: 1 }),
+      ])
+
+      // Expected: 1× /v1/apps + 2× /v1/builds = 3 total
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
     it('throws AscNotFoundError when bundle_id is not in the team', async () => {
       fetchMock.mockResolvedValueOnce(
         jsonResponse(200, {
@@ -200,15 +225,17 @@ describe('AscClient', () => {
         .mockResolvedValueOnce(
           jsonResponse(200, {
             data: [
-              { id: 'b3', attributes: { version: '1.0.3', uploadedDate: '2026-03-01T00:00:00Z', processingState: 'VALID' } },
-              { id: 'b2', attributes: { version: '1.0.2', uploadedDate: '2026-02-01T00:00:00Z', processingState: 'VALID' } },
+              { id: 'b3', attributes: { version: '1.0.3', buildNumber: '42', uploadedDate: '2026-03-01T00:00:00Z', processingState: 'VALID' } },
+              { id: 'b2', attributes: { version: '1.0.2', buildNumber: '41', uploadedDate: '2026-02-01T00:00:00Z', processingState: 'VALID' } },
             ],
           }),
         )
 
       const client = createAscClient(defaultOpts())
       const latest = await client.getLatestBuild('com.a', { processing_state: 'VALID' })
-      expect((latest as { id: string }).id).toBe('b3')
+      expect(latest.id).toBe('b3')
+      expect(latest.version).toBe('1.0.3')
+      expect(latest.build_number).toBe('42')
     })
   })
 })

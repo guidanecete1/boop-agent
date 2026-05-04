@@ -40,8 +40,8 @@ export interface ListBuildsOpts {
 export interface AscClient {
   listApps(): Promise<AscApp[]>
   listBuilds(bundleId: string, opts?: ListBuildsOpts): Promise<AscBuild[]>
-  getBuild(bundleId: string, buildId: string): Promise<unknown>
-  getLatestBuild(bundleId: string, opts?: ListBuildsOpts): Promise<unknown>
+  getBuild(bundleId: string, buildId: string): Promise<AscBuild>
+  getLatestBuild(bundleId: string, opts?: ListBuildsOpts): Promise<AscBuild>
 }
 
 export interface ClientOpts {
@@ -69,6 +69,11 @@ export function createAscClient(opts: ClientOpts): AscClient {
   let cachedToken: CachedToken | null = null
   // Cache app_id by bundle_id; populated lazily by resolveAppId.
   const appIdByBundle = new Map<string, string>()
+  // In-flight dedup: parallel callers share a single /v1/apps fetch.
+  // Cleared after each fetch completes so subsequent (sequential) listApps()
+  // calls still re-fetch — this preserves the JWT-caching test's contract
+  // that listApps() twice in a row hits fetch twice.
+  let inFlightAppsFetch: Promise<AscApp[]> | null = null
 
   function getJwt(): string {
     const now = Date.now()
@@ -125,7 +130,7 @@ export function createAscClient(opts: ClientOpts): AscClient {
     return res.json()
   }
 
-  async function fetchAllApps(): Promise<AscApp[]> {
+  async function populateAppsCache(): Promise<AscApp[]> {
     const body = (await call('/v1/apps', { limit: 200 })) as {
       data: Array<{ id: string; attributes: { bundleId: string; name: string; sku: string; primaryLocale: string } }>
     }
@@ -138,6 +143,24 @@ export function createAscClient(opts: ClientOpts): AscClient {
     }))
     for (const a of apps) appIdByBundle.set(a.bundle_id, a.id)
     return apps
+  }
+
+  async function fetchAllApps(): Promise<AscApp[]> {
+    // If another caller is mid-fetch, share their result instead of firing a
+    // duplicate /v1/apps request. After the in-flight resolves, the ref is
+    // cleared so subsequent (sequential) calls fetch fresh — the JWT-caching
+    // test relies on this (two listApps() calls in a row should hit fetch
+    // twice).
+    if (inFlightAppsFetch) {
+      return inFlightAppsFetch
+    }
+    const promise = populateAppsCache()
+    inFlightAppsFetch = promise
+    try {
+      return await promise
+    } finally {
+      inFlightAppsFetch = null
+    }
   }
 
   async function resolveAppId(bundleId: string): Promise<string> {
@@ -156,7 +179,7 @@ export function createAscClient(opts: ClientOpts): AscClient {
     return {
       id: d.id,
       version: a.version as string | undefined,
-      build_number: a.version as string | undefined,
+      build_number: a.buildNumber as string | undefined,
       processing_state: a.processingState as AscBuild['processing_state'],
       uploaded_date: a.uploadedDate as string | undefined,
       expiration_date: a.expirationDate as string | undefined,
@@ -185,8 +208,10 @@ export function createAscClient(opts: ClientOpts): AscClient {
     async getBuild(bundleId, buildId) {
       // Resolve to ensure the bundle is in our team (defensive — and primes cache).
       await resolveAppId(bundleId)
-      const body = await call(`/v1/builds/${buildId}`)
-      return body
+      const body = (await call(`/v1/builds/${buildId}`)) as {
+        data: { id: string; attributes: Record<string, unknown> }
+      }
+      return buildFromAttributes(body.data)
     },
     async getLatestBuild(bundleId, optsArg = {}) {
       const appId = await resolveAppId(bundleId)
