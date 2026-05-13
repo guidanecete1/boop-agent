@@ -100,10 +100,10 @@ executor_type (IMPLEMENTED):
 - "personal-assistant" — in-process, Composio (NO supabase / NO revenuecat by design) + WebSearch + WebFetch. For email, calendar, notes, contacts, web lookups. NOT for SQL or DB queries.
 - "ios" — CC subprocess in iOS-native projects (mila, pepbuddy). For Swift / Xcode / Fastlane work. Project type must be "ios-native".
 - "web" — CC subprocess in Next.js / Vercel projects (rosibel-admin, rosibel-website). For Next.js code edits, Vercel deploys, project-bound PRs via gh CLI. Project type must be "nextjs-vercel". Has NO supabase access — DB work belongs to "db".
+- "expo" — CC subprocess in Expo / React Native projects (rosibel-clientes). For Expo code edits, EAS builds (long-running, fire-and-forget), EAS updates, EAS submissions. Project type must be "expo". Has boop-asc + boop-eas; no Fastlane (use ios for that), no supabase (use db).
 - "db" — cross-project DB executor. Has Supabase (Composio multi-account) + RevenueCat (boop-revenuecat MCP). For SQL queries / schema / migrations / row counts / RC subscriptions / RC metrics. Pass project_slug so it can resolve the right connected_account_id and RC env-var name from registry metadata. Use this for "how many X are in Y" style questions even if the project happens to be a Next.js app.
 
 executor_type (NOT YET IMPLEMENTED, will return an error if dispatched — surface as roadmap gap instead):
-- "expo" — Spec 4 (rosibel-clientes Expo app)
 - "marketing" / "design" / "holafly" — Spec 5
 
 mode:

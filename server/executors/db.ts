@@ -43,7 +43,7 @@ Cross-domain handoff (CRITICAL):
 - If the DB change requires a sibling code change (e.g. you added a column the admin UI must render, or you changed a column type the client app must decode), end your reply with a clearly marked block:
     HANDOFF_TO: <web|expo|ios>
     REASON: <one-line summary, e.g. "rosibel-admin's <Header> needs to read the new last_seen_at column">
-    NOTE: <optional, e.g. project slug, file hint, "expo executor not yet implemented — Spec 4">
+    NOTE: <optional, e.g. project slug, file hint, "marketing executor not yet implemented — Spec 5">
 - Do NOT tell the user "you also need to update the admin app yourself". The orchestrator handles cross-domain dispatch via HANDOFF_TO.
 - One handoff per reply. If multiple downstream changes are needed (web AND expo), pick the highest-priority one for HANDOFF_TO and mention the other in NOTE.
 

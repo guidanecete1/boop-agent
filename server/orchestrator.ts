@@ -10,6 +10,7 @@ import { runPersonalAssistantExecutor } from './executors/personal-assistant.js'
 import { runIosExecutor } from './executors/ios.js'
 import { runWebExecutor } from './executors/web.js'
 import { runDbExecutor } from './executors/db.js'
+import { runExpoExecutor } from './executors/expo.js'
 import { EXECUTOR_TYPES, type ExecutorType, type ExecutorResult } from './executors/types.js'
 
 const ORCHESTRATOR_SYSTEM = `You are the Orchestrator. Your only job is to plan, route, and coordinate. You DO NOT execute work directly — you dispatch executors.
@@ -26,14 +27,14 @@ Routing rules:
 2. Decompose multi-step / multi-domain tasks into sub-tasks. Each sub-task gets ONE executor.
 3. Pick executor_type based on the WORK, not the project type:
    - Code work in iOS-native project (mila, pepbuddy) → "ios"  (project type MUST be "ios-native")
-   - Code work in Expo project → "expo"   [NOT YET IMPLEMENTED — Spec 4]  (project type MUST be "expo")
+   - Code work in Expo project (rosibel-clientes) → "expo"  (project type MUST be "expo")
    - Code work in Next.js / Vercel project → "web"  (project type MUST be "nextjs-vercel")
    - Database / schema / migrations / SQL / data queries / "how many X are in Y", row counts, anything that requires running SQL against a project's Supabase / RevenueCat IAP / subs / metrics → "db"
    - Email / calendar / notes / web search / contact lookups (NOT DB lookups) → "personal-assistant"
    - ASO / paid ads / SEO / copy / brand → "marketing"   [NOT YET IMPLEMENTED — Spec 5]
    - Design critique / mockup gen → "design"   [NOT YET IMPLEMENTED — Spec 5]
    - Holafly-specific advisory → "holafly"   [NOT YET IMPLEMENTED — Spec 5]
-4. Executor-type ↔ project-type guard: NEVER dispatch a code executor to a project whose type doesn't match. e.g. dispatching "web" against rosibel-clientes (type "expo") is WRONG. If the user wants Expo code work and "expo" is not yet implemented, surface as a roadmap gap (see "Do this now vs. note for later" below) — do NOT fall back to "web".
+4. Executor-type ↔ project-type guard: NEVER dispatch a code executor to a project whose type doesn't match. e.g. dispatching "web" against rosibel-clientes (type "expo") is WRONG even though both happen to be JS — use "expo" for that project. If the user wants work for a project whose executor is not yet implemented (e.g. marketing/design/holafly for Spec 5), surface as a roadmap gap (see "Do this now vs. note for later" below) — do NOT fall back to a different executor type.
 
 CRITICAL ANTI-PATTERN: Never route SQL / migration / schema / data-query work to "personal-assistant". The db-executor has the right system prompt for safe schema work + draft discipline + per-project connection resolution. Personal-assistant has NO Supabase access (intentionally — code-level enforcement); attempting to route a SQL task there will fail. Examples that MUST go to "db":
   - "¿Cuántos clientes activos tiene Rosi?" → db
@@ -159,6 +160,8 @@ async function dispatchExecutorImpl(input: {
       res = await runDbExecutor(opts)
       break
     case 'expo':
+      res = await runExpoExecutor(opts)
+      break
     case 'marketing':
     case 'design':
     case 'holafly':

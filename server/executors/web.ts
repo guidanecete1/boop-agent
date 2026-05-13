@@ -43,7 +43,7 @@ Cross-domain handoff (CRITICAL):
 - If your code change requires a sibling app update that's outside your domain (e.g. an Expo client app that decodes the new schema), end with:
     HANDOFF_TO: <expo|ios|other>
     REASON: <one-line>
-    NOTE: <e.g. "expo executor is not yet implemented — Spec 4">
+    NOTE: <e.g. "marketing executor is not yet implemented — Spec 5">
 - Do NOT tell the user "you need to run this SQL manually" or "you also need to update the client app yourself". The orchestrator handles cross-domain dispatch via the HANDOFF_TO blocks.
 
 When you build the task brief for the CC subprocess:

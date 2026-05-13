@@ -286,4 +286,35 @@ export default defineSchema({
     .index("by_run_id", ["runId"])
     .index("by_project", ["projectSlug"])
     .index("by_status", ["status"]),
+
+  buildJobs: defineTable({
+    jobId: v.string(),
+    executorRunId: v.string(),
+    conversationId: v.string(),
+    kind: v.union(
+      v.literal("fastlane_lane"),
+      v.literal("eas_build"),
+      v.literal("eas_submit"),
+      v.literal("eas_update"),
+    ),
+    projectSlug: v.string(),
+    args: v.string(), // stringified JSON of original tool args
+    pid: v.optional(v.number()),
+    remoteId: v.optional(v.string()), // EAS build/submission IDs
+    status: v.union(
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
+    startedAt: v.number(),
+    heartbeatSentAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    resultText: v.optional(v.string()),
+    resultArtifact: v.optional(v.string()),
+    errorTail: v.optional(v.string()),
+    chainTo: v.optional(v.string()), // stringified JSON: { kind, args }
+  })
+    .index("by_jobId", ["jobId"])
+    .index("by_status", ["status"]),
 });
