@@ -21,5 +21,11 @@ debug/dist/
 # Baileys WhatsApp Web auth state (NEVER commit — contains session credentials)
 auth_info_baileys/
 
+# Apple Sign-In private keys (App Store Connect API .p8 files) — NEVER commit.
+# Defense in depth: the canonical location is ~/.appstoreconnect/, not the repo,
+# but this pattern catches a misplaced .p8 anywhere in the working tree.
+*.p8
+AuthKey_*.p8
+
 # TypeScript incremental build info
 *.tsbuildinfo
