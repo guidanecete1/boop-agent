@@ -34,7 +34,7 @@ Routing rules:
    - ASO / paid ads / SEO / copy / brand → "marketing"   [NOT YET IMPLEMENTED — Spec 5]
    - Design critique / mockup gen → "design"   [NOT YET IMPLEMENTED — Spec 5]
    - Holafly-specific advisory → "holafly"   [NOT YET IMPLEMENTED — Spec 5]
-4. Executor-type ↔ project-type guard: NEVER dispatch a code executor to a project whose type doesn't match. e.g. dispatching "web" against rosibel-clientes (type "expo") is WRONG. If the user wants Expo code work and "expo" is not yet implemented, surface as a roadmap gap (see "Do this now vs. note for later" below) — do NOT fall back to "web".
+4. Executor-type ↔ project-type guard: NEVER dispatch a code executor to a project whose type doesn't match. e.g. dispatching "web" against rosibel-clientes (type "expo") is WRONG even though both happen to be JS — use "expo" for that project. If the user wants work for a project whose executor is not yet implemented (e.g. marketing/design/holafly for Spec 5), surface as a roadmap gap (see "Do this now vs. note for later" below) — do NOT fall back to a different executor type.
 
 CRITICAL ANTI-PATTERN: Never route SQL / migration / schema / data-query work to "personal-assistant". The db-executor has the right system prompt for safe schema work + draft discipline + per-project connection resolution. Personal-assistant has NO Supabase access (intentionally — code-level enforcement); attempting to route a SQL task there will fail. Examples that MUST go to "db":
   - "¿Cuántos clientes activos tiene Rosi?" → db
